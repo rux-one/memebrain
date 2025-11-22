@@ -1,0 +1,2 @@
+Let's make a pivot since `transformers.js` do not seem to work with the `moondream` model.
+Let's rewrite the whole backend in python and implement the intended image describing behavior as originally instructed.

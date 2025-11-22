@@ -17,7 +17,6 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { trpc } from '../trpc';
 
 const query = ref('');
 const message = ref('');
@@ -27,7 +26,8 @@ async function search() {
   if (!query.value.trim()) return;
   
   try {
-    const result = await trpc.meme.search.query({ query: query.value });
+    const res = await fetch(`http://localhost:3000/api/meme/search?query=${encodeURIComponent(query.value)}`);
+    const result = await res.json();
     message.value = result.message;
     hasSearched.value = true;
   } catch (error) {

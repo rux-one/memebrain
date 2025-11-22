@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import path from 'path';
 import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
+import { imageService } from './services/imageService';
 
 const app = express();
 const PORT = 3000;
@@ -34,8 +35,9 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
+
 // Upload Endpoint
-app.post('/api/meme/upload', upload.single('image'), async (req, res) => {
+app.post('/api/meme/upload', upload.single('image') as any, async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -48,6 +50,9 @@ app.post('/api/meme/upload', upload.single('image'), async (req, res) => {
     await sharp(req.file.buffer)
       .toFormat('jpeg', { quality: 80 })
       .toFile(outputPath);
+
+    // Generate caption in background
+    imageService.generateCaption(outputPath);
 
     res.json({ success: true, filename });
   } catch (error) {
