@@ -7,13 +7,29 @@ from typing import Optional
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from PIL import Image
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 
 # Configuration
-DATA_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../data"))
+PORT = int(os.getenv("PORT", 3000))
+DATA_PATH_ENV = os.getenv("DATA_PATH", "../data")
+
+# Handle relative paths correctly depending on run context
+if os.path.isabs(DATA_PATH_ENV):
+    DATA_DIR = DATA_PATH_ENV
+else:
+    # If relative, assume relative to this file (or CWD)
+    # Using CWD is better for Docker/Env flexibility
+    DATA_DIR = os.path.abspath(DATA_PATH_ENV)
+
 os.makedirs(DATA_DIR, exist_ok=True)
+print(f"Data directory: {DATA_DIR}")
+
+# Frontend Dist Path (configurable or default)
+STATIC_DIR = os.getenv("STATIC_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "../client/dist")))
 
 def cleanup_filename(filename):
     allowed_chars = string.ascii_letters + string.digits + "_"
@@ -137,6 +153,21 @@ async def upload_meme(image: UploadFile = File(...)):
         print(f"Upload failed: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+# Serve Frontend if available
+if os.path.exists(STATIC_DIR):
+    print(f"Serving static files from: {STATIC_DIR}")
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Check if file exists in static dir (e.g. favicon.ico)
+        file_path = os.path.join(STATIC_DIR, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        
+        # Fallback to index.html
+        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=3000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)

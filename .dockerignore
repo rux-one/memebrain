@@ -1,0 +1,17 @@
+node_modules
+npm-debug.log
+data
+.git
+.gitignore
+.env
+.env.example
+Dockerfile
+docker-compose.yml
+README.md
+README_PYTHON.md
+start_server_py.sh
+venv
+server_py/venv
+server_py/__pycache__
+client/node_modules
+server/node_modules
