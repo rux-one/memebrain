@@ -37,7 +37,6 @@ COPY --from=frontend-builder /app/client/dist ./client/dist
 ENV STATIC_DIR=/app/client/dist
 ENV PORT=3000
 ENV DATA_PATH=/app/data
-ENV PYTHONUNBUFFERED=1
 
 # Create data dir
 RUN mkdir -p /app/data
