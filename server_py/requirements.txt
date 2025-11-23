@@ -9,5 +9,5 @@ timm
 torchvision
 accelerate
 python-dotenv
-chromadb
+qdrant-client
 sentence-transformers

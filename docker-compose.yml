@@ -11,30 +11,19 @@ services:
       - DATA_PATH=/app/data
       - HF_HOME=/app/hf_cache
       - NVIDIA_VISIBLE_DEVICES=all
-      - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
     env_file:
       - .env
     depends_on:
-      - chromadb
+      - qdrant
     restart: unless-stopped
 
-  chromadb:
-    image: chromadb/chroma
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
     volumes:
-      - ./chroma_data:/chroma/chroma
-    ports:
-      - "8000:8000"
-    environment:
-      - IS_PERSISTENT=TRUE
-
-  chroma-admin:
-    image: thanatosdi/chromadb-admin
-    ports:
-      - "3001:3000"
-    environment:
-      - CHROMA_URL=http://chromadb:8000
-    depends_on:
-      - chromadb
+      - ./qdrant_data:/qdrant/storage
 
 

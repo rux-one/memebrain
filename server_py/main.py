@@ -5,7 +5,8 @@ import string
 from contextlib import asynccontextmanager
 from typing import Optional
 from dotenv import load_dotenv
-import chromadb
+from qdrant_client import QdrantClient
+from qdrant_client.http import models
 from sentence_transformers import SentenceTransformer
 
 # Load .env from current working directory (better for run-time flexibility)
@@ -23,8 +24,8 @@ import torch
 PORT = int(os.getenv("PORT", 3000))
 MOONDREAM_REVISION = os.getenv("MOONDREAM_REVISION", "2025-06-21")
 DATA_PATH_ENV = os.getenv("DATA_PATH", "../data")
-CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", 8000))
+QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 
 # Handle relative paths correctly depending on run context
 if os.path.isabs(DATA_PATH_ENV):
@@ -50,18 +51,18 @@ def cleanup_filename(filename):
 model = None
 tokenizer = None
 embedding_model = None
-chroma_client = None
-chroma_collection = None
+qdrant_client = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model, tokenizer, embedding_model, chroma_client, chroma_collection
+    global model, tokenizer, embedding_model, qdrant_client
     print("Initializing models...")
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
+    # Initialize Moondream2
     try:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        print(f"Using device: {device}")
-        
-        # Initialize Moondream2
         print("Initializing Moondream2...")
         model = AutoModelForCausalLM.from_pretrained(
             "vikhyatk/moondream2",
@@ -71,20 +72,35 @@ async def lifespan(app: FastAPI):
             device_map=device
         )
         print("Moondream2 initialized.")
+    except Exception as e:
+        print(f"Error initializing Moondream2: {e}")
 
-        # Initialize Embedding Model
+    # Initialize Embedding Model
+    try:
         print("Initializing Embedding Model (all-MiniLM-L6-v2)...")
         embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         print("Embedding Model initialized.")
-
-        # Initialize ChromaDB
-        print(f"Connecting to ChromaDB at {CHROMA_HOST}:{CHROMA_PORT}...")
-        chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
-        chroma_collection = chroma_client.get_or_create_collection(name="memes")
-        print("ChromaDB connected.")
-
     except Exception as e:
-        print(f"Error initializing: {e}")
+        print(f"Error initializing Embedding Model: {e}")
+
+    # Initialize Qdrant
+    try:
+        print(f"Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}...")
+        qdrant_client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+        
+        # Check/Create collection
+        collections = qdrant_client.get_collections()
+        collection_names = [c.name for c in collections.collections]
+        
+        if "memes" not in collection_names:
+            print("Creating 'memes' collection in Qdrant...")
+            qdrant_client.create_collection(
+                collection_name="memes",
+                vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
+            )
+        print("Qdrant connected and collection verified.")
+    except Exception as e:
+        print(f"Error initializing Qdrant: {e}")
     
     yield
     
@@ -138,14 +154,12 @@ async def upload_meme(image: UploadFile = File(...)):
                 try:
                     # Generate caption
                     caption = model.caption(rgb_img, length="short", settings=settings)
-                    caption = { 'caption': 'A child in a maroon jacket holds a burger in a fast food restaurant, with a white background and black logo.' }
                     print(f"Generated Caption for {filename}: {caption['caption']}")
 
                     # Generate filename
                     print("Generating filename...")
                     fn_query = "Return a short, single-line, descriptive caption for the following picture. Use minimum words, like it's a filename. Avoid using special characters."
                     fn_result = model.query(rgb_img, fn_query)
-                    fn_result = { 'answer': 'a_young_child_holds_and_eats_a_burger' }
                     
                     # Check if result is dict or direct string (handling potential variations)
                     fn_answer = fn_result["answer"] if isinstance(fn_result, dict) and "answer" in fn_result else str(fn_result)
@@ -166,19 +180,29 @@ async def upload_meme(image: UploadFile = File(...)):
                     os.rename(filepath, new_filepath)
                     filename = generated_filename
 
-                    # Generate Embedding and Save to ChromaDB
-                    if embedding_model and chroma_collection:
+                    # Generate Embedding and Save to Qdrant
+                    if embedding_model and qdrant_client:
                         print(f"Generating embedding for {filename}...")
                         caption_text = caption['caption']
                         embedding = embedding_model.encode(caption_text).tolist()
                         
-                        chroma_collection.add(
-                            ids=[filename],
-                            embeddings=[embedding],
-                            metadatas=[{"filename": filename, "caption": caption_text}],
-                            documents=[caption_text]
+                        # Use UUID for Qdrant ID
+                        point_id = str(uuid.uuid4())
+                        
+                        qdrant_client.upsert(
+                            collection_name="memes",
+                            points=[
+                                models.PointStruct(
+                                    id=point_id,
+                                    vector=embedding,
+                                    payload={
+                                        "filename": filename,
+                                        "caption": caption_text
+                                    }
+                                )
+                            ]
                         )
-                        print("Saved to ChromaDB.")
+                        print("Saved to Qdrant.")
 
                 except Exception as e:
                     print(f"Error generating metadata: {e}")
@@ -208,4 +232,4 @@ if os.path.exists(STATIC_DIR):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, reload=False, reload_dirs=[os.path.dirname(__file__)])
