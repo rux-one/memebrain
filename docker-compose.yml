@@ -1,6 +1,7 @@
 services:
   memebrain:
     build: .
+    runtime: nvidia
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     volumes:
@@ -9,6 +10,7 @@ services:
       - PORT=${PORT:-3000}
       - DATA_PATH=/app/data
       - HF_HOME=/app/hf_cache
+      - NVIDIA_VISIBLE_DEVICES=all
     env_file:
       - .env
     restart: unless-stopped
