@@ -1,5 +1,6 @@
 <template>
   <div class="flex flex-col items-center justify-center h-[80vh]">
+    <Logo class="text-purple-500 mb-8" width="16rem" height="16rem" />
     <div class="w-full max-w-lg p-8 bg-gray-800 rounded-xl border border-dashed border-gray-600 hover:border-gray-400 transition-colors cursor-pointer relative" @click="triggerFileInput">
       <input
         ref="fileInput"
@@ -28,6 +29,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import Logo from '../components/Logo.vue';
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const uploading = ref(false);

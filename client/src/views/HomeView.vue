@@ -1,5 +1,6 @@
 <template>
   <div class="flex flex-col items-center justify-center h-[80vh]">
+    <Logo class="text-purple-500 mb-8" width="16rem" height="16rem" />
     <div class="w-full max-w-2xl">
       <input
         v-model="query"
@@ -17,6 +18,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import Logo from '../components/Logo.vue';
 
 const query = ref('');
 const message = ref('');

@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
 
     # Initialize Moondream2
     try:
-        print("Initializing Moondream2...", flush=True)
+        print("Initializing Moondream2... [revision: {}]".format(MOONDREAM_REVISION), flush=True)
         model = AutoModelForCausalLM.from_pretrained(
             "vikhyatk/moondream2",
             trust_remote_code=True,
