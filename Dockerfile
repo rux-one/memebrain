@@ -1,9 +1,19 @@
 # Stage 1: Build Frontend
 FROM node:20-slim AS frontend-builder
+WORKDIR /app
+
+# Copy root package files and client package file to leverage workspace support
+COPY package*.json ./
+COPY client/package.json ./client/
+
+# Install dependencies (using npm ci for reproducible builds)
+RUN npm ci
+
+# Copy client source
+COPY client/ ./client/
+
+# Build client
 WORKDIR /app/client
-COPY client/package*.json ./
-RUN npm install
-COPY client/ ./
 RUN npm run build
 
 # Stage 2: Setup Python Backend
@@ -27,6 +37,7 @@ COPY --from=frontend-builder /app/client/dist ./client/dist
 ENV STATIC_DIR=/app/client/dist
 ENV PORT=3000
 ENV DATA_PATH=/app/data
+ENV PYTHONUNBUFFERED=1
 
 # Create data dir
 RUN mkdir -p /app/data
