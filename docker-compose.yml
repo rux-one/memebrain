@@ -6,6 +6,7 @@ services:
       - "${PORT:-3000}:${PORT:-3000}"
     volumes:
       - ${DATA_PATH:-./data}:/app/data
+      - ./server_py:/app/server_py
     environment:
       - PORT=${PORT:-3000}
       - DATA_PATH=/app/data
