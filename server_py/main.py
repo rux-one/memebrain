@@ -67,8 +67,9 @@ async def lifespan(app: FastAPI):
         model = AutoModelForCausalLM.from_pretrained(
             "vikhyatk/moondream2",
             trust_remote_code=True,
-            # revision=MOONDREAM_REVISION,
-        ).to(device=device, dtype=torch.float32 if device == "cpu" else torch.float16)
+            revision=MOONDREAM_REVISION,
+            dtype=torch.float32 if device == "cpu" else torch.float16,
+        ).to(device=device)
         print("Moondream2 initialized.", flush=True)
     except Exception as e:
         print(f"Error initializing Moondream2: {e}", flush=True)
