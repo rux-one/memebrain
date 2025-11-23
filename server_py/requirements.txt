@@ -9,3 +9,5 @@ timm
 torchvision
 accelerate
 python-dotenv
+chromadb
+sentence-transformers

@@ -5,6 +5,8 @@ import string
 from contextlib import asynccontextmanager
 from typing import Optional
 from dotenv import load_dotenv
+import chromadb
+from sentence_transformers import SentenceTransformer
 
 # Load .env from current working directory (better for run-time flexibility)
 load_dotenv(os.path.join(os.getcwd(), ".env"))
@@ -21,6 +23,8 @@ import torch
 PORT = int(os.getenv("PORT", 3000))
 MOONDREAM_REVISION = os.getenv("MOONDREAM_REVISION", "2025-06-21")
 DATA_PATH_ENV = os.getenv("DATA_PATH", "../data")
+CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+CHROMA_PORT = int(os.getenv("CHROMA_PORT", 8000))
 
 # Handle relative paths correctly depending on run context
 if os.path.isabs(DATA_PATH_ENV):
@@ -45,30 +49,42 @@ def cleanup_filename(filename):
 # Global model state
 model = None
 tokenizer = None
+embedding_model = None
+chroma_client = None
+chroma_collection = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global model, tokenizer
-    print("Initializing Moondream2 model...")
+    global model, tokenizer, embedding_model, chroma_client, chroma_collection
+    print("Initializing models...")
     try:
         device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"Using device: {device}")
         
+        # Initialize Moondream2
+        print("Initializing Moondream2...")
         model = AutoModelForCausalLM.from_pretrained(
             "vikhyatk/moondream2",
             trust_remote_code=True,
             # revision=MOONDREAM_REVISION,
-            # Using float32 for CPU safety if bfloat16 isn't supported, but user used bfloat16.
-            # I'll stick to what works or let it auto-cast.
-            # For CPU, float32 is safer.
             dtype=torch.float32 if device == "cpu" else torch.float16,
             device_map=device
         )
-        # Note: Moondream2 model object handles tokenizer/processor internally for .caption() usually,
-        # but let's ensure we have what we need.
-        print("Moondream2 model initialized.")
+        print("Moondream2 initialized.")
+
+        # Initialize Embedding Model
+        print("Initializing Embedding Model (all-MiniLM-L6-v2)...")
+        embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+        print("Embedding Model initialized.")
+
+        # Initialize ChromaDB
+        print(f"Connecting to ChromaDB at {CHROMA_HOST}:{CHROMA_PORT}...")
+        chroma_client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
+        chroma_collection = chroma_client.get_or_create_collection(name="memes")
+        print("ChromaDB connected.")
+
     except Exception as e:
-        print(f"Error initializing model: {e}")
+        print(f"Error initializing: {e}")
     
     yield
     
@@ -122,12 +138,14 @@ async def upload_meme(image: UploadFile = File(...)):
                 try:
                     # Generate caption
                     caption = model.caption(rgb_img, length="short", settings=settings)
+                    caption = { 'caption': 'A child in a maroon jacket holds a burger in a fast food restaurant, with a white background and black logo.' }
                     print(f"Generated Caption for {filename}: {caption['caption']}")
 
                     # Generate filename
                     print("Generating filename...")
                     fn_query = "Return a short, single-line, descriptive caption for the following picture. Use minimum words, like it's a filename. Avoid using special characters."
                     fn_result = model.query(rgb_img, fn_query)
+                    fn_result = { 'answer': 'a_young_child_holds_and_eats_a_burger' }
                     
                     # Check if result is dict or direct string (handling potential variations)
                     fn_answer = fn_result["answer"] if isinstance(fn_result, dict) and "answer" in fn_result else str(fn_result)
@@ -147,6 +165,20 @@ async def upload_meme(image: UploadFile = File(...)):
                         
                     os.rename(filepath, new_filepath)
                     filename = generated_filename
+
+                    # Generate Embedding and Save to ChromaDB
+                    if embedding_model and chroma_collection:
+                        print(f"Generating embedding for {filename}...")
+                        caption_text = caption['caption']
+                        embedding = embedding_model.encode(caption_text).tolist()
+                        
+                        chroma_collection.add(
+                            ids=[filename],
+                            embeddings=[embedding],
+                            metadatas=[{"filename": filename, "caption": caption_text}],
+                            documents=[caption_text]
+                        )
+                        print("Saved to ChromaDB.")
 
                 except Exception as e:
                     print(f"Error generating metadata: {e}")

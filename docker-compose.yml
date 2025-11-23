@@ -11,6 +11,30 @@ services:
       - DATA_PATH=/app/data
       - HF_HOME=/app/hf_cache
       - NVIDIA_VISIBLE_DEVICES=all
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
     env_file:
       - .env
+    depends_on:
+      - chromadb
     restart: unless-stopped
+
+  chromadb:
+    image: chromadb/chroma
+    volumes:
+      - ./chroma_data:/chroma/chroma
+    ports:
+      - "8000:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+
+  chroma-admin:
+    image: thanatosdi/chromadb-admin
+    ports:
+      - "3001:3000"
+    environment:
+      - CHROMA_URL=http://chromadb:8000
+    depends_on:
+      - chromadb
+
+
