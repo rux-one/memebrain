@@ -1,4 +1,3 @@
 #!/bin/bash
 source venv/bin/activate
-cd server_py
-python main.py
+python server_py/main.py

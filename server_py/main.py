@@ -4,6 +4,10 @@ import shutil
 import string
 from contextlib import asynccontextmanager
 from typing import Optional
+from dotenv import load_dotenv
+
+# Load .env from current working directory (better for run-time flexibility)
+load_dotenv(os.path.join(os.getcwd(), ".env"))
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +19,7 @@ import torch
 
 # Configuration
 PORT = int(os.getenv("PORT", 3000))
+MOONDREAM_REVISION = os.getenv("MOONDREAM_REVISION", "2025-06-21")
 DATA_PATH_ENV = os.getenv("DATA_PATH", "../data")
 
 # Handle relative paths correctly depending on run context
@@ -52,6 +57,7 @@ async def lifespan(app: FastAPI):
         model = AutoModelForCausalLM.from_pretrained(
             "vikhyatk/moondream2",
             trust_remote_code=True,
+            revision=MOONDREAM_REVISION,
             # Using float32 for CPU safety if bfloat16 isn't supported, but user used bfloat16.
             # I'll stick to what works or let it auto-cast.
             # For CPU, float32 is safer.

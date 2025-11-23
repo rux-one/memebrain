@@ -26,7 +26,7 @@ async function search() {
   if (!query.value.trim()) return;
   
   try {
-    const res = await fetch(`http://localhost:3000/api/meme/search?query=${encodeURIComponent(query.value)}`);
+    const res = await fetch(`/api/meme/search?query=${encodeURIComponent(query.value)}`);
     const result = await res.json();
     message.value = result.message;
     hasSearched.value = true;

@@ -59,7 +59,7 @@ async function handleFileChange(event: Event) {
   formData.append('image', file);
 
   try {
-    const res = await fetch('http://localhost:3000/api/meme/upload', {
+    const res = await fetch('/api/meme/upload', {
       method: 'POST',
       body: formData,
     });
