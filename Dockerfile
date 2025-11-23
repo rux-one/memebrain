@@ -41,6 +41,8 @@ ENV DATA_PATH=/app/data
 # Create data dir
 RUN mkdir -p /app/data
 
+RUN apt-get update && apt-get install -y libvips-dev
+
 # Expose port
 EXPOSE 3000
 
