@@ -57,7 +57,7 @@ async def lifespan(app: FastAPI):
         model = AutoModelForCausalLM.from_pretrained(
             "vikhyatk/moondream2",
             trust_remote_code=True,
-            revision=MOONDREAM_REVISION,
+            # revision=MOONDREAM_REVISION,
             # Using float32 for CPU safety if bfloat16 isn't supported, but user used bfloat16.
             # I'll stick to what works or let it auto-cast.
             # For CPU, float32 is safer.
