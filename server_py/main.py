@@ -117,13 +117,80 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/api/meme/image/{filename}")
+async def get_meme_image(filename: str):
+    """Serve meme images from the data directory"""
+    filepath = os.path.join(DATA_DIR, filename)
+    
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    return FileResponse(filepath, media_type="image/jpeg")
+
 @app.get("/api/meme/search")
-async def search_memes(query: str = ""):
-    return {
-        "message": "Search is unimplemented in this iteration (Python backend)",
-        "results": [],
-        "query": query
-    }
+async def search_memes(query: str = "", threshold: float = 0.5):
+    if not query.strip():
+        return {"message": "Empty query", "results": [], "query": query}
+    
+    if not embedding_model or not qdrant_client:
+        return {"message": "Search models not initialized", "results": [], "query": query}
+    
+    try:
+        # Generate embedding for the query
+        query_embedding = embedding_model.encode(query).tolist()
+        
+        # Search in Qdrant
+        try:
+            # Try query_points (newer API)
+            search_result = qdrant_client.query_points(
+                collection_name="memes",
+                query=query_embedding,
+                limit=20,
+                score_threshold=threshold,
+                with_payload=True
+            ).points
+        except (AttributeError, TypeError):
+            try:
+                # Try query (alternative API)
+                search_result = qdrant_client.query(
+                    collection_name="memes",
+                    query_vector=query_embedding,
+                    limit=20,
+                    score_threshold=threshold,
+                    with_payload=True
+                )
+            except (AttributeError, TypeError):
+                 # Fallback to what we saw in the list that looks most promising if the above fail
+                 # But query_points is definitely in the list provided by the user
+                search_result = qdrant_client.query_points(
+                    collection_name="memes",
+                    query=query_embedding,
+                    limit=20,
+                    score_threshold=threshold,
+                    with_payload=True
+                ).points
+
+        # Format results
+        
+        # Format results
+        results = []
+        for point in search_result:
+            results.append({
+                "id": point.id,
+                "score": point.score,
+                "filename": point.payload.get("filename", ""),
+                "caption": point.payload.get("caption", "")
+            })
+        
+        return {
+            "message": f"Found {len(results)} results",
+            "results": results,
+            "query": query
+        }
+        
+    except Exception as e:
+        print(f"Search error: {e}")
+        return {"message": f"Search error: {str(e)}", "results": [], "query": query}
 
 @app.post("/api/meme/upload")
 async def upload_meme(image: UploadFile = File(...)):
