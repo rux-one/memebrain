@@ -12,3 +12,4 @@ python-dotenv
 qdrant-client
 sentence-transformers
 pyvips
+watchdog>=3.0.0

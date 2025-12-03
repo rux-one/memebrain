@@ -1,0 +1,1 @@
+Implement a feature where whenever the contents of the data directory changes (new files added), those files are automatically processed and indexed, instead of requiring manual upload through the API.
