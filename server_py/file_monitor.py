@@ -9,6 +9,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Set
 from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 from PIL import Image
 
@@ -149,7 +150,8 @@ class FileMonitor:
         process_callback: Callable,
         executor: ThreadPoolExecutor,
         loop: asyncio.AbstractEventLoop,
-        max_queue_size: int = 100
+        max_queue_size: int = 100,
+        use_polling: bool = False
     ):
         """
         Initialize the file monitor.
@@ -160,12 +162,14 @@ class FileMonitor:
             executor: Thread pool for blocking operations
             loop: Event loop for async operations
             max_queue_size: Maximum number of files that can be queued
+            use_polling: Use polling observer for network filesystems (e.g., davfs)
         """
         self.data_dir = data_dir
         self.process_callback = process_callback
         self.executor = executor
         self.loop = loop
         self.max_queue_size = max_queue_size
+        self.use_polling = use_polling
         self.observer = None
         self.handler = None
     
@@ -175,7 +179,8 @@ class FileMonitor:
             print("[FileMonitor] Already running")
             return
         
-        print(f"[FileMonitor] Starting monitor for: {self.data_dir} (max queue: {self.max_queue_size})")
+        observer_type = "PollingObserver" if self.use_polling else "Observer"
+        print(f"[FileMonitor] Starting monitor for: {self.data_dir} (max queue: {self.max_queue_size}, type: {observer_type})")
         
         self.handler = ImageFileHandler(
             self.process_callback,
@@ -185,7 +190,12 @@ class FileMonitor:
             self.max_queue_size
         )
         
-        self.observer = Observer()
+        # Use PollingObserver for network filesystems (davfs, NFS, etc.)
+        if self.use_polling:
+            self.observer = PollingObserver()
+        else:
+            self.observer = Observer()
+        
         self.observer.schedule(self.handler, self.data_dir, recursive=False)
         self.observer.start()
         

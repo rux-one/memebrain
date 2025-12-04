@@ -30,6 +30,7 @@ DATA_PATH_ENV = os.getenv("DATA_PATH", "../data")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 ENABLE_FILE_MONITOR = os.getenv("ENABLE_FILE_MONITOR", "true").lower() == "true"
+USE_POLLING_OBSERVER = os.getenv("USE_POLLING_OBSERVER", "false").lower() == "true"
 MAX_WORKER_THREADS = int(os.getenv("MAX_WORKER_THREADS", 4))
 MAX_QUEUE_SIZE = int(os.getenv("MAX_QUEUE_SIZE", 100))
 
@@ -248,7 +249,8 @@ async def lifespan(app: FastAPI):
                 process_callback=process_image_file,
                 executor=executor,
                 loop=loop,
-                max_queue_size=MAX_QUEUE_SIZE
+                max_queue_size=MAX_QUEUE_SIZE,
+                use_polling=USE_POLLING_OBSERVER
             )
             file_monitor.start()
         except Exception as e:
